@@ -25,8 +25,8 @@ This program simply searches for the first instance of the `MotionPhoto_Data` ma
 
 *(Note: This could potentially result in invalid photo and video files if the JPEG half of the original file happens to contain this string. You could construct a valid motion photo that will be split incorrectly, or a plain JPEG that will incorrectly be detected as a motion photo, by putting "MotionPhoto_Data" in the JPEG comment field. It would be more correct to parse the JPEG data and only accept the marker if it appears directly after the end of the image data. However, the program is intended to parse photos taken with a phone, which will never put that string in the comment; and the chances of the string appearing randomly in the JPEG image stream are unbelievably tiny, so this naive implementation should be sufficient.)*
 
-##Credit
+## Credit
 This method of splitting motion photos was first published by XDA user [goofwear](http://forum.xda-developers.com/member.php?u=2489239) in [this thread](https://forum.xda-developers.com/android/software/samsung-motion-photo-extractor-t3339997). This project does the same, just in a single exe that doesn't require the user to do things to extract each photo.
 
-##License
+## License
 This code is published under the [MIT license](https://github.com/joemck/ExtractMotionPhotos/blob/master/LICENSE).
