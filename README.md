@@ -19,7 +19,7 @@ The above options may be combined into -dq or -qd, like in POSIX programs.
 The exit code will always be 0 on success, 1 on error, and 2 if the user was prompted for files but cancelled the dialog box.
 
 ## Multilingual version
-ExtractMotionPhotos is now bilingual! It supports US English and Traditional Chinese. The Chinese translation is thanks to [AndyLain](http://andylain.blogspot.com). By default, you'll see the app in Chinese if your Windows is set to display its UI in any form of Chinese, and English otherwise. You can override this by putting **\\_zh** at the end of the exe file's name to get Chinese, or **\\_en** for English. For instance, to use the app in Chinese on an English OS, you might name it **ExtractMotionPhotos\\_zh.exe**.
+ExtractMotionPhotos is now bilingual! It supports US English and Traditional Chinese. The Chinese translation is thanks to [AndyLain](http://andylain.blogspot.com). By default, you'll see the app in Chinese if your Windows is set to display its UI in any form of Chinese, and English otherwise. You can override this by putting **\_zh** at the end of the exe file's name to get Chinese, or **\_en** for English. For instance, to use the app in Chinese on an English OS, you might name it **ExtractMotionPhotos\_zh.exe**.
 
 ## Description of Motion Photo File Format
 Samsung motion photos are simply a complete JPEG image followed by a 16-byte marker and then a complete MP4 video. The marker itself is `MotionPhoto_Data`.
