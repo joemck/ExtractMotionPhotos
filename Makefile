@@ -15,12 +15,12 @@ WINDRES = windres
 LD = gcc
 RM = rm -f
 
-CFLAGS += -Os
-LDFLAGS += -lcomdlg32 -mwindows
+CFLAGS += -Os -DUNICODE -D_UNICODE -DWINVER=0x0501 -D_WIN32_WINNT=0x0501
+LDFLAGS += -lcomdlg32 -mwindows -municode
 
 TARGET = ExtractMotionPhotos.exe
-OBJ = main.o res.o
-HEADERS = 
+OBJ = main.o lang.o res.o
+HEADERS = lang.h lang_en-us.h lang_zh-tw.h
 RES_O = res.o
 RES_RC = res.rc
 RES_DEPENDS = icon_multires.ico

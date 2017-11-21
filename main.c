@@ -7,8 +7,11 @@
 
 #include <stdio.h>
 #include <windows.h>
+#include <wchar.h>
+#include <io.h>
 #include <string.h>
 #include <strings.h>
+#include "lang.h"
 
 //max filenames allowed to be given
 #define MAX_FILES 25000
@@ -16,90 +19,77 @@
 //error messages as dialog, printf, or nothing
 int msgLvl = 2;
 #define ALERT(msg, title, flags) do { \
-	if(msgLvl == 2) MessageBox(NULL, (msg), (title), (flags)); \
-	else if(msgLvl == 1) printf("%s\r\n", (msg)); \
+	if(msgLvl == 2) MessageBoxW(NULL, (msg), (title), (flags)); \
+	else if(msgLvl == 1) wprintf(L"%s\r\n", (msg)); \
 } while(0)
 
 //Show usage info
 void usage(void) {
-	static const char *msg = 
-"You can use this program 3 different ways:\r\n"
-"\r\n"
-"GUI USE: Just run it. You'll get an file-open dialog where you can open .jpg files. Use ctrl or shift or drag to select more than one.\r\n"
-"\r\n"
-"DRAG & DROP USE: Drag one or more motion photos onto the icon for this exe.\r\n"
-"\r\n"
-"COMMAND LINE USE: Run this program with one or more motion photo file names as arguments. Remember to use \"quotes\" if there are spaces in the names.\r\n"
-"\r\n"
-"Any way you run it, the original files will not be modified. The extracted photo and video will be stored in *_photo.jpg and *_video.mp4 where * is the name of the original file, minus the .jpg extension.\r\n"
-"\r\n"
-"Coded by Chupi383. All credit for the method goes to goofwear at the XDA forums. I've just ported their .bat file to plain C and Win32.";
-	ALERT(msg, "Samsung Motion Photo Batch Extractor", MB_OK);
+	ALERT(TR(USAGE), TR(APP_TITLE), MB_OK);
 }
 
 //Show a file-open dialog box and add the selected files to the names array
 //returns 1 on success, 0 on failure
-int promptForFiles(int *namesCnt, char names[][MAX_PATH]) {
-	OPENFILENAME ofn;
-	char filenames[512*1024];
+int promptForFiles(int *namesCnt, WCHAR names[][MAX_PATH]) {
+	OPENFILENAMEW ofn;
+	WCHAR filenames[512*1024];
 
 	memset(&ofn, 0, sizeof(ofn));
 	memset(&filenames, 0, sizeof(filenames));
 
 	//Windows file-open dialogs are a bit ridiculous...
 	ofn.lStructSize = sizeof(ofn);
-	ofn.lpstrFilter = "Motion Photos (*.jpg)\0*.JPG\0\0";
+	ofn.lpstrFilter = TR(FILETYPES);
 	ofn.lpstrFile = filenames;	//dirname, NULL, then filenames in it separated by NULLs, with 2 NULLs at the end
 	ofn.nMaxFile = sizeof(filenames);
-	ofn.lpstrTitle = "Open some Samsung Motion Photos";
+	ofn.lpstrTitle = TR(OPEN_TITLEBAR);
 	ofn.Flags = OFN_ALLOWMULTISELECT | OFN_EXPLORER | OFN_FILEMUSTEXIST;
 
-	if(GetOpenFileName(&ofn)) {
+	if(GetOpenFileNameW(&ofn)) {
 		//Success! Parse the output
-		int dir_len = strlen(filenames);
+		int dir_len = wcslen(filenames);
 		int i = dir_len + 1;	//skip past the base dir name
 
 		if(filenames[i] == '\0') {
 			//only one file selected
 			if(dir_len + 1 > MAX_PATH) {
-				char buf[4096];
-				snprintf(buf, sizeof(buf), "Skipping too-long path:\r\n%s", filenames);
-				ALERT(buf, "Error", MB_OK|MB_ICONERROR);
+				WCHAR buf[4096];
+				swprintf(buf, sizeof(buf)/sizeof(WCHAR), TR(SKIP_LONG_PATH), filenames, L"", L"");
+				ALERT(buf, TR(ERROR_TITLEBAR), MB_OK|MB_ICONERROR);
 				return 0;
 			} else {
-				strcpy(names[*namesCnt], filenames);
+				wcsncpy(names[*namesCnt], filenames, MAX_PATH);
 				(*namesCnt)++;
 			}
 		} else {
 			//multiple files selected
 			//there will be a file with a null name after the end
-			while(filenames[i] != '\0' && *namesCnt < MAX_FILES) {
-				int file_len = strlen(&filenames[i]);
+			while(filenames[i] != L'\0' && *namesCnt < MAX_FILES) {
+				int file_len = wcslen(&filenames[i]);
 				//sanity check; +2: 1 for added /, 1 for null
 				if(dir_len + file_len + 2 > MAX_PATH) {
-					char buf[4096];
-					snprintf(buf, sizeof(buf), "Skipping too-long path:\r\n%s\\%s", filenames, &filenames[i]);
-					ALERT(buf, "Error", MB_OK|MB_ICONERROR);
+					WCHAR buf[4096];
+					swprintf(buf, sizeof(buf)/sizeof(WCHAR), TR(SKIP_LONG_PATH), filenames, L"\\", &filenames[i]);
+					ALERT(buf, TR(ERROR_TITLEBAR), MB_OK|MB_ICONERROR);
 				} else {
-					strcpy(names[*namesCnt], filenames);
-					strcat(names[*namesCnt], "\\");
-					strcat(names[*namesCnt], &filenames[i]);
+					wcsncpy(names[*namesCnt], filenames, MAX_PATH);
+					wcscat(names[*namesCnt], L"\\");
+					wcscat(names[*namesCnt], &filenames[i]);
 					(*namesCnt)++;
 				}
 				//move to next name
 				i += file_len + 1;
 			}
 
-			if(filenames[i] != '\0') {
-				char buf[1024];
-				snprintf(buf, sizeof(buf), "You've selected too many files. I can only do up to %d at a time.", MAX_FILES);
-				ALERT(buf, "Error", MB_OK|MB_ICONERROR);
+			if(filenames[i] != L'\0') {
+				WCHAR buf[1024];
+				swprintf(buf, sizeof(buf)/sizeof(WCHAR), TR(ERROR_TOO_MANY_FILES_NUM), MAX_FILES);
+				ALERT(buf, TR(ERROR_TITLEBAR), MB_OK|MB_ICONERROR);
 				return 0;
 			}
 		}
 	} else if(CommDlgExtendedError() == FNERR_BUFFERTOOSMALL) {
-		static const char *msg = "You've selected too many files. Try selecting fewer files and process them in bunches.";
-		ALERT(msg, "Error", MB_OK|MB_ICONERROR);
+		ALERT(TR(ERROR_TOO_MANY_FILES_UNK), TR(ERROR_TITLEBAR), MB_OK|MB_ICONERROR);
 		return 0;
 	}	//otherwise the user has probably cancelled the dialog box
 	return 1;
@@ -162,35 +152,37 @@ ssize_t findMagic(unsigned char *buf, ssize_t size) {
 	return -1;
 }
 
-int main(int argc, char **argv) {
+int wmain(int argc, WCHAR **argv) {
 	int fileCnt, filenum, i;
 	FILE *infile, *outfile;
 	ssize_t bytes, bytes2, split;
 
-	static char names[MAX_FILES][MAX_PATH];
+	static WCHAR names[MAX_FILES][MAX_PATH];
 	int namesCnt = 0;
-	char namePhoto[MAX_PATH+6], nameVideo[MAX_PATH+6];
+	WCHAR namePhoto[MAX_PATH+6], nameVideo[MAX_PATH+6];
 
 	unsigned char *fileData;
 
 	int notMotionPhoto = 0, successPhoto = 0, successVideo = 0;
 	int thisPhotoOK, thisVideoOK;
 
-	char msgBuf[4096];
+	WCHAR msgBuf[4096];
 
 	int deleteOrig = 0, success;
+
+	detectLanguage(argc, argv);
 
 	memset(names, 0, sizeof(names));
 
 	fileCnt=0;
 	for(i=1; i<argc; i++) {
 		//check if this is a command line option
-		if(argv[i][0]=='-' || argv[i][0]=='/') {
+		if(argv[i][0]==L'-' || argv[i][0]==L'/') {
 			int d=0, q=0, bad=0, j;
-			for(j=1; argv[i][j] != '\0' && !bad; j++) {
+			for(j=1; argv[i][j] != L'\0' && !bad; j++) {
 				int ch = argv[i][j];
-				if(ch == 'd' && !d) d=1;
-				else if(ch == 'q' && q<2) q++;
+				if(ch == L'd' && !d) d=1;
+				else if(ch == L'q' && q<2) q++;
 				else bad=1;
 			}
 			if(!bad && (d || q)) {
@@ -202,18 +194,18 @@ int main(int argc, char **argv) {
 			}	//else, drop through and store this filename, it just happened to start with a -
 		}
 
-		strncpy(names[fileCnt], argv[i], MAX_PATH);
-		if(names[fileCnt][MAX_PATH-1] == '\0') {
+		wcsncpy(names[fileCnt], argv[i], MAX_PATH);
+		if(names[fileCnt][MAX_PATH-1] == L'\0') {
 			fileCnt++;
 			if(fileCnt > MAX_FILES) {
-				snprintf(msgBuf, sizeof(msgBuf), "You've selected too many files. I can only do up to %d at a time.", MAX_FILES);
-				ALERT(msgBuf, "Error", MB_OK|MB_ICONERROR);
+				swprintf(msgBuf, sizeof(msgBuf)/sizeof(WCHAR), TR(ERROR_TOO_MANY_FILES_NUM), MAX_FILES);
+				ALERT(msgBuf, TR(ERROR_TITLEBAR), MB_OK|MB_ICONERROR);
 				return 1;
 			}
 		} else {
-			snprintf(msgBuf, sizeof(msgBuf), "Skipping too-long path:\r\n%s", argv[i]);
-			ALERT(msgBuf, "Error", MB_OK|MB_ICONERROR);
-			names[fileCnt][MAX_PATH-1] = '\0';	//reset detection so we don't skip all further names
+			swprintf(msgBuf, sizeof(msgBuf)/sizeof(WCHAR), TR(SKIP_LONG_PATH), argv[i], L"", L"");
+			ALERT(msgBuf, TR(ERROR_TITLEBAR), MB_OK|MB_ICONERROR);
+			names[fileCnt][MAX_PATH-1] = L'\0';	//reset detection so we don't skip all further names
 		}
 	}
 
@@ -228,11 +220,11 @@ int main(int argc, char **argv) {
 
 	for(filenum = 0; filenum < fileCnt; filenum++) {
 		//validate name -- only accept *.jpg
-		i = strlen(names[filenum]);
-		if(names[filenum][i-4]!='.'
-				|| names[filenum][i-3]!='j'
-				|| names[filenum][i-2]!='p'
-				|| names[filenum][i-1]!='g') {
+		i = wcslen(names[filenum]);
+		if(names[filenum][i-4]!=L'.'
+				|| names[filenum][i-3]!=L'j'
+				|| names[filenum][i-2]!=L'p'
+				|| names[filenum][i-1]!=L'g') {
 			notMotionPhoto++;
 			continue;
 		}
@@ -240,13 +232,13 @@ int main(int argc, char **argv) {
 		//generate output names
 		memset(namePhoto, 0, sizeof(namePhoto));
 		memset(nameVideo, 0, sizeof(nameVideo));
-		strncpy(namePhoto, names[filenum], i-4);
-		strcat(namePhoto, "_photo.jpg");
-		strncpy(nameVideo, names[filenum], i-4);
-		strcat(nameVideo, "_video.mp4");
+		wcsncpy(namePhoto, names[filenum], i-4);
+		wcscat(namePhoto, TR(PHOTO_APPEND));
+		wcsncpy(nameVideo, names[filenum], i-4);
+		wcscat(nameVideo, TR(VIDEO_APPEND));
 
 		//open and read the input
-		infile = fopen(names[filenum], "rb");
+		infile = _wfopen(names[filenum], L"rb");
 		fseek(infile, 0, SEEK_END);
 		bytes = ftell(infile);
 		if(bytes <= 0) {
@@ -256,15 +248,15 @@ int main(int argc, char **argv) {
 		fseek(infile, 0, SEEK_SET);
 		fileData = malloc(bytes);
 		if(!fileData) {
-			snprintf(msgBuf, sizeof(msgBuf), "Can't allocate RAM to read %ld bytes from %s", bytes, names[filenum]);
-			ALERT(msgBuf, "Error", MB_OK|MB_ICONERROR);
+			swprintf(msgBuf, sizeof(msgBuf)/sizeof(WCHAR), TR(ERROR_OUT_OF_MEMORY), bytes, names[filenum]);
+			ALERT(msgBuf, TR(ERROR_TITLEBAR), MB_OK|MB_ICONERROR);
 			return 1;
 		}
 		bytes2 = fread(fileData, 1, bytes, infile);
 		fclose(infile);
 		if(bytes2 != bytes) {
-			snprintf(msgBuf, sizeof(msgBuf), "Skipping due to read error:\r\n%s", names[filenum]);
-			ALERT(msgBuf, "Error", MB_OK|MB_ICONERROR);
+			swprintf(msgBuf, sizeof(msgBuf)/sizeof(WCHAR), TR(SKIP_READ_ERROR), names[filenum]);
+			ALERT(msgBuf, TR(ERROR_TITLEBAR), MB_OK|MB_ICONERROR);
 			notMotionPhoto++;
 			continue;
 		}
@@ -281,7 +273,7 @@ int main(int argc, char **argv) {
 		thisPhotoOK = thisVideoOK = 0;
 
 		//write the photo portion (before split)
-		outfile = fopen(namePhoto, "wb");
+		outfile = _wfopen(namePhoto, L"wb");
 		if(outfile) {
 			bytes2 = fwrite(fileData, 1, split, outfile);
 			fclose(outfile);
@@ -289,13 +281,13 @@ int main(int argc, char **argv) {
 				successPhoto++;
 				thisPhotoOK = 1;
 			} else {
-				snprintf(msgBuf, sizeof(msgBuf), "Can't write to %s", namePhoto);
-				ALERT(msgBuf, "Error", MB_OK|MB_ICONERROR);
+				swprintf(msgBuf, sizeof(msgBuf)/sizeof(WCHAR), TR(SKIP_WRITE_ERROR), namePhoto);
+				ALERT(msgBuf, TR(ERROR_TITLEBAR), MB_OK|MB_ICONERROR);
 			}
 		}
 
 		//write the video portion (after the split)
-		outfile = fopen(nameVideo, "wb");
+		outfile = _wfopen(nameVideo, L"wb");
 		if(outfile) {
 			bytes2 = fwrite(fileData+split+16, 1, bytes-split-16, outfile);
 			fclose(outfile);
@@ -303,24 +295,24 @@ int main(int argc, char **argv) {
 				successVideo++;
 				thisVideoOK = 1;
 			} else {
-				snprintf(msgBuf, sizeof(msgBuf), "Can't write to %s", namePhoto);
-				ALERT(msgBuf, "Error", MB_OK|MB_ICONERROR);
+				swprintf(msgBuf, sizeof(msgBuf)/sizeof(WCHAR), TR(SKIP_WRITE_ERROR), namePhoto);
+				ALERT(msgBuf, TR(ERROR_TITLEBAR), MB_OK|MB_ICONERROR);
 			}
 		}
 
 		if(deleteOrig && thisPhotoOK && thisVideoOK)
-			unlink(names[filenum]);
+			_wunlink(names[filenum]);
 
 		free(fileData);
 	}
 
-	bytes = snprintf(msgBuf, sizeof(msgBuf), "Finished extracting Motion Photos\r\n    Photos extracted: %d\r\n    Videos extracted: %d", successPhoto, successVideo);
+	bytes = swprintf(msgBuf, sizeof(msgBuf)/sizeof(WCHAR), TR(SUCCESS_MSG), successPhoto, successVideo);
 	if(notMotionPhoto > 0)
-		snprintf(msgBuf+bytes, sizeof(msgBuf)-bytes, "\r\n%d files were skipped because they weren't Motion Photos", notMotionPhoto);
+		swprintf(msgBuf+bytes, sizeof(msgBuf)/sizeof(WCHAR)-bytes, TR(SUCCESS_MSG_SKIP), notMotionPhoto);
 	if(successPhoto>0 || successVideo>0)
-		ALERT(msgBuf, "Success", MB_OK|(notMotionPhoto?MB_ICONWARNING:MB_ICONINFORMATION));
+		ALERT(msgBuf, TR(SUCCESS_TITLEBAR), MB_OK|(notMotionPhoto?MB_ICONWARNING:MB_ICONINFORMATION));
 	else
-		ALERT(msgBuf, "Failure", MB_OK|MB_ICONERROR);
+		ALERT(msgBuf, TR(FAILURE_TITLEBAR), MB_OK|MB_ICONERROR);
 
 	return 0;
 }
