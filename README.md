@@ -8,8 +8,6 @@ This program accepts input files in three different ways:
 
 2. Using drag-and-drop. Drag a bunch of motion photos onto the program's icon and it will convert them.
 
-*Tip:* If you want to use the command line options described below with the file dialog or drag-and-drop methods, create a shortcut to the program. Right click the shortcut and choose Properties. In the Shortcut tab, add a space and the command line options you want to the Target box. You can now double-click or drag files onto this shortcut.
-
 3. On the command line. Simply pass each filename as a separate argument, and it will process all of them. This doubles as a drag-and-drop method, because that's what Windows does when you drop files on an exe's icon.
 
 Result files will be placed in the same directory as the source file they came from. The photo data will be in *${FILENAME}_photo.jpg*, and the video data will be in *${FILENAME}_video.mp4*. Neither is re-encoded, so no quality is lost.
@@ -23,6 +21,8 @@ If "-q" or "/q" is passed on the command line before any filenames, all dialog b
 The above options may be combined into -dq, -qdr, /rdqq, etc. like in POSIX programs.
 
 The exit code will always be 0 on success, 1 on error, and 2 if the user was prompted for files but cancelled the dialog box.
+
+*Tip:* If you want to use command line with the file dialog or drag-and-drop methods, create a shortcut to the program. Right click the shortcut and choose Properties. In the Shortcut tab, add a space and the command line options you want to the Target box. You can now double-click or drag files onto this shortcut.
 
 ## Multilingual version
 ExtractMotionPhotos is now bilingual! It supports US English and Traditional Chinese. The Chinese translation is thanks to [AndyLain](http://andylain.blogspot.com). By default, you'll see the app in Chinese if your Windows is set to display its UI in any form of Chinese, and English otherwise. You can override this by putting **\_zh** at the end of the exe file's name to get Chinese, or **\_en** for English. For instance, to use the app in Chinese on an English OS, you might name it **ExtractMotionPhotos\_zh.exe**.
