@@ -28,6 +28,24 @@ void usage(void) {
 	ALERT(TR(USAGE), TR(APP_TITLE), MB_OK);
 }
 
+//Show an alert with a short message and the error message for error codes from GetLastError
+void ShowWin32Error(LPCWSTR message, DWORD errcode) {
+	LPWSTR errstr = NULL;
+	WCHAR msgBuf[4096];
+	FormatMessageW(
+			FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_ARGUMENT_ARRAY | FORMAT_MESSAGE_ALLOCATE_BUFFER,	//dwFlags
+			NULL,	//lpSource
+			errcode,	//dwMessageId
+			0,	//dwLanguageId
+			errstr,	//lpBuffer
+			0,	//nSize
+			NULL	//Arguments
+			);
+	swprintf(msgBuf, sizeof(msgBuf)/sizeof(WCHAR), L"%s\r\n%s", message, errstr);
+	LocalFree(errstr); errstr = NULL;
+	ALERT(msgBuf, TR(ERROR_TITLEBAR), MB_OK|MB_ICONERROR);
+}
+
 //Show a file-open dialog box and add the selected files to the names array
 //returns 1 on success, 0 on failure
 int promptForFiles(int *namesCnt, WCHAR names[][MAX_PATH]) {
@@ -125,14 +143,14 @@ void initSearch(const unsigned char *magic, int magiclen, char *d1, char *d2) {
 }
 
 //Boyer-Moore string search -- this is considerably faster than a plain linear search
-ssize_t findMagic(unsigned char *buf, ssize_t size) {
+SSIZE_T findMagic(unsigned char *buf, SSIZE_T size) {
 	const unsigned char magic[] = {
 		0x4D, 0x6F, 0x74, 0x69, 0x6F, 0x6E, 0x50, 0x68,
 		0x6F, 0x74, 0x6F, 0x5F, 0x44, 0x61, 0x74, 0x61 };
 	static char d1[256];
 	static char d2[sizeof(magic)];
 	static BOOL inited = FALSE;
-	ssize_t i, j;
+	SSIZE_T i, j;
 
 	if(!inited) {
 		initSearch(magic, sizeof(magic), d1, d2);
@@ -154,12 +172,15 @@ ssize_t findMagic(unsigned char *buf, ssize_t size) {
 
 int wmain(int argc, WCHAR **argv) {
 	int fileCnt, filenum, i;
-	FILE *infile, *outfile;
-	ssize_t bytes, bytes2, split;
+	HANDLE infile, outfile;
+	LARGE_INTEGER filesize;
+	SSIZE_T bytes, bytes2, split;
+	DWORD bytesDone;
+	BOOL success;
 
 	static WCHAR names[MAX_FILES][MAX_PATH];
 	int namesCnt = 0;
-	WCHAR namePhoto[MAX_PATH+6], nameVideo[MAX_PATH+6];
+	WCHAR namePhoto[MAX_PATH+32], nameVideo[MAX_PATH+32], nameOrig[MAX_PATH+32];
 
 	unsigned char *fileData;
 
@@ -168,7 +189,12 @@ int wmain(int argc, WCHAR **argv) {
 
 	WCHAR msgBuf[4096];
 
-	int deleteOrig = 0, success;
+	int deleteOrig = 0, renameOrig = 0;
+
+	FILETIME creationTime, lastWriteTime;	//we now preserve file timestamps
+	BOOL haveFileTime;	//we store the result of GetFileTime here, so if there's a problem we can skip touching new files instead of touching with bad values
+
+	DWORD err;
 
 	detectLanguage(argc, argv);
 
@@ -177,17 +203,23 @@ int wmain(int argc, WCHAR **argv) {
 	fileCnt=0;
 	for(i=1; i<argc; i++) {
 		//check if this is a command line option
+		//if an argument starts with - or / and contains only 'd' (max 1), 'q' (max 2) and 'r' (max 1) characters, it's options
+		// -d: Delete the original file when done.
+		// -q: Quiet. Puts messages on the terminal instead of dialogs. A second q shuts up terminal messages too.
+		// -r: Rename original to *_original.jpg (or delete it if combined with -d), and do not append _photo and _video to extracted.
 		if(argv[i][0]==L'-' || argv[i][0]==L'/') {
-			int d=0, q=0, bad=0, j;
+			int d=0, q=0, r=0, bad=0, j;
 			for(j=1; argv[i][j] != L'\0' && !bad; j++) {
 				int ch = argv[i][j];
 				if(ch == L'd' && !d) d=1;
+				else if(ch == L'r' && !r) r=1;
 				else if(ch == L'q' && q<2) q++;
 				else bad=1;
 			}
-			if(!bad && (d || q)) {
+			if(!bad && (d || r || q)) {
 				//this was a valid command line arg, we should save its result
 				if(d) deleteOrig = 1;
+				if(r) renameOrig = 1;
 				if(q) msgLvl -= q;
 				if(msgLvl < 0) msgLvl = 0;
 				continue;	//don't store this as a filename, it contained only up to 1 d and 2 q's
@@ -222,41 +254,82 @@ int wmain(int argc, WCHAR **argv) {
 		//validate name -- only accept *.jpg
 		i = wcslen(names[filenum]);
 		if(names[filenum][i-4]!=L'.'
-				|| names[filenum][i-3]!=L'j'
-				|| names[filenum][i-2]!=L'p'
-				|| names[filenum][i-1]!=L'g') {
+				|| ( names[filenum][i-3]!=L'j' && names[filenum][i-3]!=L'J' )
+				|| ( names[filenum][i-2]!=L'p' && names[filenum][i-2]!=L'P' )
+				|| ( names[filenum][i-1]!=L'g' && names[filenum][i-1]!=L'G' )) {
 			notMotionPhoto++;
 			continue;
 		}
 
 		//generate output names
 		memset(namePhoto, 0, sizeof(namePhoto));
-		memset(nameVideo, 0, sizeof(nameVideo));
 		wcsncpy(namePhoto, names[filenum], i-4);
-		wcscat(namePhoto, TR(PHOTO_APPEND));
+		wcscat(namePhoto, TR(renameOrig ? PHOTO_NO_APPEND : PHOTO_APPEND));
+
+		memset(nameVideo, 0, sizeof(nameVideo));
 		wcsncpy(nameVideo, names[filenum], i-4);
-		wcscat(nameVideo, TR(VIDEO_APPEND));
+		wcscat(nameVideo, TR(renameOrig ? VIDEO_NO_APPEND : VIDEO_APPEND));
+
+		if(renameOrig) {	//this string is only used if we are renaming the original
+			memset(nameOrig, 0, sizeof(nameOrig));
+			wcsncpy(nameOrig, names[filenum], i-4);
+			wcscat(nameOrig, TR(ORIG_APPEND));
+		}
 
 		//open and read the input
-		infile = _wfopen(names[filenum], L"rb");
-		fseek(infile, 0, SEEK_END);
-		bytes = ftell(infile);
-		if(bytes <= 0) {
+		//now using the win32 way for better control
+		infile = CreateFileW(
+				names[filenum],	//lpFileName
+				GENERIC_READ,	//dwDesiredAccess
+				FILE_SHARE_READ,	//dwShareMode
+				NULL,	//lpSecurityAttributes
+				OPEN_EXISTING,	//dwCreationDisposition
+				FILE_FLAG_SEQUENTIAL_SCAN,	//dwFlagsAndAttributes
+				NULL	//hTemplateFile
+				);
+		if(infile == INVALID_HANDLE_VALUE) {
+			ShowWin32Error(names[filenum], GetLastError());
 			notMotionPhoto++;
 			continue;
 		}
-		fseek(infile, 0, SEEK_SET);
-		fileData = malloc(bytes);
+
+		//store its file times
+		haveFileTime = GetFileTime(infile, &creationTime, NULL, &lastWriteTime);
+
+		//get the size of the file
+		if(!GetFileSizeEx(infile, &filesize)) {
+			ShowWin32Error(names[filenum], GetLastError());
+			CloseHandle(infile);
+			notMotionPhoto++;
+			continue;
+		}
+
+		bytes = filesize.QuadPart;
+
+		//I sincerely hope nobody has managed to take a motion photo bigger than 4 GB. Either way, this program does not support large files so we skip anything that big.
+		if(bytes > UINT_MAX) {
+			CloseHandle(infile);
+			notMotionPhoto++;
+			continue;
+		}
+
+		//allocate space for the entire file in memory
+		fileData = LocalAlloc(0, bytes);
 		if(!fileData) {
+			err = GetLastError();
+			CloseHandle(infile);
 			swprintf(msgBuf, sizeof(msgBuf)/sizeof(WCHAR), TR(ERROR_OUT_OF_MEMORY), bytes, names[filenum]);
-			ALERT(msgBuf, TR(ERROR_TITLEBAR), MB_OK|MB_ICONERROR);
+			ShowWin32Error(msgBuf, err);
 			return 1;
 		}
-		bytes2 = fread(fileData, 1, bytes, infile);
-		fclose(infile);
-		if(bytes2 != bytes) {
+
+		//read the file
+		success = ReadFile(infile, fileData, (DWORD)bytes, &bytesDone, NULL);
+		err = GetLastError();
+		CloseHandle(infile);
+		if(!success || bytesDone != bytes) {
 			swprintf(msgBuf, sizeof(msgBuf)/sizeof(WCHAR), TR(SKIP_READ_ERROR), names[filenum]);
-			ALERT(msgBuf, TR(ERROR_TITLEBAR), MB_OK|MB_ICONERROR);
+			ShowWin32Error(msgBuf, err);
 			notMotionPhoto++;
 			continue;
 		}
@@ -266,44 +339,74 @@ int wmain(int argc, WCHAR **argv) {
 
 		//if we didn't find the magic in the file, it's not a motion photo
 		if(split < 0) {
+			LocalFree(fileData);
 			notMotionPhoto++;
 			continue;
 		}
 
+		//rename the original so we don't overwrite it
+		if(renameOrig)
+			MoveFileW(names[filenum], nameOrig);
+
 		thisPhotoOK = thisVideoOK = 0;
 
 		//write the photo portion (before split)
-		outfile = _wfopen(namePhoto, L"wb");
-		if(outfile) {
-			bytes2 = fwrite(fileData, 1, split, outfile);
-			fclose(outfile);
-			if(bytes2 == split) {
+		outfile = CreateFileW(namePhoto, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL|FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+		if(outfile == INVALID_HANDLE_VALUE) {
+			err = GetLastError();
+			swprintf(msgBuf, sizeof(msgBuf)/sizeof(WCHAR), TR(SKIP_WRITE_ERROR), namePhoto);
+			ShowWin32Error(msgBuf, err);
+		} else {
+			success = WriteFile(outfile, fileData, (DWORD)split, &bytesDone, NULL);
+			err = GetLastError();
+			if(haveFileTime)
+				SetFileTime(outfile, &creationTime, NULL, &lastWriteTime);
+			CloseHandle(outfile);
+			if(success && bytesDone == (DWORD)split) {
 				successPhoto++;
 				thisPhotoOK = 1;
 			} else {
 				swprintf(msgBuf, sizeof(msgBuf)/sizeof(WCHAR), TR(SKIP_WRITE_ERROR), namePhoto);
-				ALERT(msgBuf, TR(ERROR_TITLEBAR), MB_OK|MB_ICONERROR);
+				ShowWin32Error(msgBuf, err);
 			}
 		}
 
 		//write the video portion (after the split)
-		outfile = _wfopen(nameVideo, L"wb");
-		if(outfile) {
-			bytes2 = fwrite(fileData+split+16, 1, bytes-split-16, outfile);
-			fclose(outfile);
-			if(bytes2 == bytes-split-16) {
+		outfile = CreateFileW(nameVideo, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL|FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+		if(outfile == INVALID_HANDLE_VALUE) {
+			err = GetLastError();
+			swprintf(msgBuf, sizeof(msgBuf)/sizeof(WCHAR), TR(SKIP_WRITE_ERROR), nameVideo);
+			ShowWin32Error(msgBuf, err);
+		} else {
+			success = WriteFile(outfile, fileData+split+16, (DWORD)(bytes-split-16), &bytesDone, NULL);
+			err = GetLastError();
+			if(haveFileTime)
+				SetFileTime(outfile, &creationTime, NULL, &lastWriteTime);
+			CloseHandle(outfile);
+			if(success && bytesDone == (DWORD)(bytes-split-16)) {
 				successVideo++;
 				thisVideoOK = 1;
 			} else {
 				swprintf(msgBuf, sizeof(msgBuf)/sizeof(WCHAR), TR(SKIP_WRITE_ERROR), namePhoto);
-				ALERT(msgBuf, TR(ERROR_TITLEBAR), MB_OK|MB_ICONERROR);
+				ShowWin32Error(msgBuf, err);
 			}
 		}
 
-		if(deleteOrig && thisPhotoOK && thisVideoOK)
-			_wunlink(names[filenum]);
+		LocalFree(fileData);
 
-		free(fileData);
+		if(deleteOrig) {
+			if(thisPhotoOK && thisVideoOK) {	//everything good, delete the original file
+				if(renameOrig)	//original was renamed, now delete it under the new name
+					DeleteFileW(nameOrig);
+				else	//original was not renamed, delete it under the old name
+					DeleteFileW(names[filenum]);
+			} else {	//everything NOT good, put things back how they were
+				DeleteFileW(namePhoto);
+				DeleteFileW(nameVideo);
+				if(renameOrig)	//we renamed the original, undo this
+					MoveFileW(nameOrig, names[filenum]);
+			}
+		}
 	}
 
 	bytes = swprintf(msgBuf, sizeof(msgBuf)/sizeof(WCHAR), TR(SUCCESS_MSG), successPhoto, successVideo);

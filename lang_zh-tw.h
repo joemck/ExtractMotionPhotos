@@ -37,8 +37,17 @@
 /* PHOTO_APPEND */
 	L"_photo.jpg"
 ,
+/* PHOTO_NO_APPEND */
+	L".jpg"
+,
 /* VIDEO_APPEND */
 	L"_video.mp4"
+,
+/* VIDEO_NO_APPEND */
+	L".mp4"
+,
+/* ORIG_APPEND */
+	L"_original.jpg"
 ,
 /* ERROR_OUT_OF_MEMORY */
 	L"記憶體定位錯誤，無法讀取 %ld bytes 上的 %s 檔案，有可能電腦的RAM不足。"

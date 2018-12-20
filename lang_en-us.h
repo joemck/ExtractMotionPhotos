@@ -37,8 +37,17 @@
 /* PHOTO_APPEND */
 	L"_photo.jpg"
 ,
+/* PHOTO_NO_APPEND */
+	L".jpg"
+,
 /* VIDEO_APPEND */
 	L"_video.mp4"
+,
+/* VIDEO_NO_APPEND */
+	L".mp4"
+,
+/* ORIG_APPEND */
+	L"_original.jpg"
 ,
 /* ERROR_OUT_OF_MEMORY */
 	L"Can't allocate RAM to read %ld bytes from %s"
