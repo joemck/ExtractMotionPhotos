@@ -2,19 +2,25 @@
 Extract Motion Photos created by Samsung phones to mp4 videos and plain jpg photos
 
 ## Usage of Program
-This program accepts input files in two different ways:
+This program accepts input files in three different ways:
 
 1. Through a standard Windows file open dialog box. Run ExtractMotionPhotos.exe without any command line arguments and it will let you browse for one or more \*.jpg files. The dialog has multi-select enabled, so you can drag or use shift to select a range of files, ctrl to individually select files, or use ctrl+A to take all files in the directory. If you cancel the dialog without selecting any files, the program will display a help message in a dialog box.
 
-2. On the command line. Simply pass each filename as a separate argument, and it will process all of them. This doubles as a drag-and-drop method, because that's what Windows does when you drop files on an exe's icon.
+2. Using drag-and-drop. Drag a bunch of motion photos onto the program's icon and it will convert them.
+
+*Tip:* If you want to use the command line options described below with the file dialog or drag-and-drop methods, create a shortcut to the program. Right click the shortcut and choose Properties. In the Shortcut tab, add a space and the command line options you want to the Target box. You can now double-click or drag files onto this shortcut.
+
+3. On the command line. Simply pass each filename as a separate argument, and it will process all of them. This doubles as a drag-and-drop method, because that's what Windows does when you drop files on an exe's icon.
 
 Result files will be placed in the same directory as the source file they came from. The photo data will be in *${FILENAME}_photo.jpg*, and the video data will be in *${FILENAME}_video.mp4*. Neither is re-encoded, so no quality is lost.
 
 If "-d" or "/d" is passed on the command line before any filenames, the original files will be deleted after successful processing. This works with both command line and GUI operation. To use it with command line drag-and-drop operation, create a shortcut to *ExtractMotionPhotos.exe* and include the -d in the command to run.
 
-If "-q" or "/q" is passed on the command line before any filenames, all dialog boxes will be suppressed. This is intended for batch operation.
+If "-r" or "/r" is passed on the command line before any filenames, the original files will be renamed with the "\_original" suffix and extracted files won't have any suffix added. This option can be combined with -d to delete the original and write the extracted photo to the same name. (Note, because of the implementation, -d -r will rename the original first with the \_original suffix, and then delete it. Normally this is insignificant, but if you have another file with the same name and \_original, that file will be lost.)
 
-The above options may be combined into -dq or -qd, like in POSIX programs.
+If "-q" or "/q" is passed on the command line before any filenames, all dialog boxes will be suppressed. This is intended for batch operation. Output will instead of printed to stdout. If you want to suppress this output as well, use "-qq" or "/qq".
+
+The above options may be combined into -dq, -qdr, /rdqq, etc. like in POSIX programs.
 
 The exit code will always be 0 on success, 1 on error, and 2 if the user was prompted for files but cancelled the dialog box.
 
