@@ -17,7 +17,7 @@
 	L"Samsung Motion Photo Batch Extractor"
 ,
 /* FILETYPES */
-	L"Motion Photos (*.jpg)\0*.JPG\0All Files\0*.*\0\0"
+	L"Motion Photos (*.jpg, *.jpeg, *.heic)\0*.JPG;*.JPEG;*.HEIC\0All Files\0*.*\0\0"
 ,
 /* OPEN_TITLEBAR */
 	L"Open some Samsung Motion Photos"
