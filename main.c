@@ -171,7 +171,9 @@ SSIZE_T findMagic(unsigned char *buf, SSIZE_T size) {
 }
 
 int wmain(int argc, WCHAR **argv) {
-	int fileCnt, filenum, i;
+	static const WCHAR *allowExts[] = { L"jpg", L"jpeg", L"heic", NULL };	//these must be in lowercase
+
+	int fileCnt, filenum, i, ext, extLen;
 	HANDLE infile, outfile;
 	LARGE_INTEGER filesize;
 	SSIZE_T bytes, bytes2, split;
@@ -181,6 +183,9 @@ int wmain(int argc, WCHAR **argv) {
 	static WCHAR names[MAX_FILES][MAX_PATH];
 	int namesCnt = 0;
 	WCHAR namePhoto[MAX_PATH+32], nameVideo[MAX_PATH+32], nameOrig[MAX_PATH+32];
+	WCHAR extLower[MAX_PATH];
+	WCHAR *extLocation;
+	BOOL extValid;
 
 	unsigned char *fileData;
 
@@ -251,29 +256,43 @@ int wmain(int argc, WCHAR **argv) {
 	}
 
 	for(filenum = 0; filenum < fileCnt; filenum++) {
-		//validate name -- only accept *.jpg
-		i = wcslen(names[filenum]);
-		if(names[filenum][i-4]!=L'.'
-				|| ( names[filenum][i-3]!=L'j' && names[filenum][i-3]!=L'J' )
-				|| ( names[filenum][i-2]!=L'p' && names[filenum][i-2]!=L'P' )
-				|| ( names[filenum][i-1]!=L'g' && names[filenum][i-1]!=L'G' )) {
+		//validate name -- only accept allowed extensions in allowExts
+		extLocation = wcsrchr(names[filenum], L'.');
+		extValid = FALSE;
+		if(extLocation != NULL) {
+			extLocation += 1;	//+1 to go 1 past the . itself
+			extLen = wcslen(extLocation);
+			//get the extension in lowercase
+			for(i=0; i<extLen; ++i)
+				extLower[i] = towlower(extLocation[i]);
+			extLower[i] = L'\0';
+			for(ext=0; allowExts[ext] != NULL; ++ext)
+				if(0 == wcsncmp(extLower, allowExts[ext], extLen))
+					extValid = TRUE;
+		}
+		if(!extValid) {
 			notMotionPhoto++;
 			continue;
 		}
 
 		//generate output names
 		memset(namePhoto, 0, sizeof(namePhoto));
-		wcsncpy(namePhoto, names[filenum], i-4);
+		wcsncpy(namePhoto, names[filenum], extLocation-names[filenum]-1);
 		wcscat(namePhoto, TR(renameOrig ? PHOTO_NO_APPEND : PHOTO_APPEND));
+		wcscat(namePhoto, L".");
+		wcscat(namePhoto, extLocation);
 
 		memset(nameVideo, 0, sizeof(nameVideo));
-		wcsncpy(nameVideo, names[filenum], i-4);
+		wcsncpy(nameVideo, names[filenum], extLocation-names[filenum]-1);
 		wcscat(nameVideo, TR(renameOrig ? VIDEO_NO_APPEND : VIDEO_APPEND));
+		wcscat(nameVideo, L".mp4");
 
 		if(renameOrig) {	//this string is only used if we are renaming the original
 			memset(nameOrig, 0, sizeof(nameOrig));
-			wcsncpy(nameOrig, names[filenum], i-4);
+			wcsncpy(nameOrig, names[filenum], extLocation-names[filenum]-1);
 			wcscat(nameOrig, TR(ORIG_APPEND));
+			wcscat(nameOrig, L".");
+			wcscat(nameOrig, extLocation);
 		}
 
 		//open and read the input

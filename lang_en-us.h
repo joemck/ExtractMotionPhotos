@@ -35,19 +35,19 @@
 	L"You've selected too many files. Try selecting fewer files and process them in bunches."
 ,
 /* PHOTO_APPEND */
-	L"_photo.jpg"
+	L"_photo"
 ,
 /* PHOTO_NO_APPEND */
-	L".jpg"
+	L""
 ,
 /* VIDEO_APPEND */
-	L"_video.mp4"
+	L"_video"
 ,
 /* VIDEO_NO_APPEND */
-	L".mp4"
+	L""
 ,
 /* ORIG_APPEND */
-	L"_original.jpg"
+	L"_original"
 ,
 /* ERROR_OUT_OF_MEMORY */
 	L"Can't allocate RAM to read %ld bytes from %s"

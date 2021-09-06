@@ -35,19 +35,19 @@
 	L"你一次選太多檔案了。嘗試選少一點檔案吧！"
 ,
 /* PHOTO_APPEND */
-	L"_photo.jpg"
+	L"_photo"
 ,
 /* PHOTO_NO_APPEND */
-	L".jpg"
+	L""
 ,
 /* VIDEO_APPEND */
-	L"_video.mp4"
+	L"_video"
 ,
 /* VIDEO_NO_APPEND */
-	L".mp4"
+	L""
 ,
 /* ORIG_APPEND */
-	L"_original.jpg"
+	L"_original"
 ,
 /* ERROR_OUT_OF_MEMORY */
 	L"記憶體定位錯誤，無法讀取 %ld bytes 上的 %s 檔案，有可能電腦的RAM不足。"
